@@ -1,6 +1,5 @@
 package org.ttn.android.sample;
 
-import android.content.DialogInterface;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
@@ -10,11 +9,13 @@ import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
 import com.lsjwzh.widget.materialloadingprogressbar.CircleProgressBar;
-import com.robinhood.spark.SparkView;
 
+import org.fusesource.mqtt.client.Callback;
+import org.fusesource.mqtt.client.QoS;
 import org.ttn.android.sdk.v1.client.MqttApiListener;
 import org.ttn.android.sdk.v1.client.TTNMqttClient;
 import org.ttn.android.sdk.v1.domain.Packet;
@@ -47,15 +48,15 @@ public class TTNAndroidSDKSampleActivity extends AppCompatActivity {
     private static final String TAG = TTNAndroidSDKSampleActivity.class.getSimpleName();
 
     // credentials to connect
-    private static final String APP_EUI = "HIDDEN";
-    private static final String ACCESS_KEY = "HIDDEN";
-    private static final String STAGING_HOST = "staging.thethingsnetwork.org";
+    private static final String APP_EUI = "sion1";
+    private static final String ACCESS_KEY = "ttn-account-v2.PDVV7x_f6G8zuYBTwqa6GV5ANXHgJSK3Ef5n5gGqzVk";
+    private static final String STAGING_HOST = "eu.thethings.network";
 
     // our views
     @Bind(R.id.toolbar) Toolbar mToolbar;
     @Bind(R.id.packet_list) RecyclerView mDataList;
-    @Bind(R.id.temperature_view) SparkView mTempView;
     @Bind(R.id.progress_bar) CircleProgressBar mProgressBar;
+    @Bind(R.id.button) Button mButton;
 
     // the client
     TTNMqttClient mTTNMqttClient;
@@ -66,7 +67,6 @@ public class TTNAndroidSDKSampleActivity extends AppCompatActivity {
 
     // adapters
     final PacketAdapter mPacketAdapter = new PacketAdapter(mPackets);
-    final TemperatureAdapter mTemperatureAdapter = new TemperatureAdapter(mPayloads);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,16 +80,9 @@ public class TTNAndroidSDKSampleActivity extends AppCompatActivity {
         mToolbar.setTitleTextColor(Color.WHITE);
         setSupportActionBar(mToolbar);
 
-        // add sample packets to show something
-        mPackets.addAll(SampleData.mSamplePackets);
-        mPayloads.addAll(SampleData.mSamplePayloads);
-
         // initially, setup recycler view to show nodes
         mDataList.setLayoutManager(new LinearLayoutManager(this));
         mDataList.setAdapter(mPacketAdapter);
-
-        // setup temperature viewer
-        mTempView.setAdapter(mTemperatureAdapter);
 
         // display dialog
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -97,6 +90,28 @@ public class TTNAndroidSDKSampleActivity extends AppCompatActivity {
         builder.setMessage(R.string.sample_data_dialog_message);
         builder.setPositiveButton(android.R.string.ok, null);
         builder.show();
+
+        Log.d(TAG, "here we come");
+
+        mButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // FIXME: 03/12/2018  This is not working yet
+                Log.d(TAG, "Trying to send a message");
+
+                mTTNMqttClient.mConnection.publish(APP_EUI + "/devices/" + "testmqtt" + "/up/+", "{\"test\": 3}".getBytes(), QoS.AT_LEAST_ONCE, false, new Callback<Void>() {
+                    @Override
+                    public void onSuccess(Void value) {
+                        Log.d(TAG, "Message sent success");
+                    }
+
+                    @Override
+                    public void onFailure(Throwable value) {
+                        Log.d(TAG, "Message sent failed");
+                    }
+                });
+            }
+        });
     }
 
     @Override
@@ -105,14 +120,6 @@ public class TTNAndroidSDKSampleActivity extends AppCompatActivity {
 
         // initial data refresh
         subscribe();
-    }
-
-    @Override
-    public void onStop() {
-        super.onStop();
-
-        // the MQTT client
-        mTTNMqttClient.disconnect();
     }
 
     /**
@@ -144,7 +151,6 @@ public class TTNAndroidSDKSampleActivity extends AppCompatActivity {
                         // update temp chart
                         Payload payload = Payload.fromEncodedPayload(packet.getPayload());
                         mPayloads.add(payload);
-                        mTemperatureAdapter.notifyDataSetChanged();
                     }
                 });
             }
@@ -180,6 +186,13 @@ public class TTNAndroidSDKSampleActivity extends AppCompatActivity {
         });
     }
 
+    @Override
+    public void onStop() {
+        super.onStop();
+
+        // the MQTT client
+        mTTNMqttClient.disconnect();
+    }
     void toastOnUiThread(final String message) {
         runOnUiThread(new Runnable() {
             @Override
